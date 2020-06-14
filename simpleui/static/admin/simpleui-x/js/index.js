@@ -1,9 +1,42 @@
 (function () {
+    if (window.frameElement) {
+        window.frameElement.contentWindow.parent.callback()
+    }
+
+    window.addEventListener('hashchange', function (e) {
+        if (e.newURL != e.oldURL) {
+            openByHash()
+        }
+    });
+
+    function openByHash() {
+        var hash = location.hash;
+        hash = hash.substring(1)
+
+        for (var i = 0; i < app.menuData.length; i++) {
+            var item = app.menuData[i]
+            if ((item.url || '/') == hash) {
+
+                app.openTab(item, item.eid, true, false);
+                break;
+            }
+        }
+    }
+
+    function changeUrl(data) {
+        if (data.url && data.url.indexOf('http') != 0) {
+            location.hash = '#' + (data.url || '/')
+        }
+    }
+
+    window.callback = function () {
+        window.location.reload()
+    }
 
     var fontConfig = new Vue({
-        el: '#dynamicCss',
+        // el: '#dynamicCss',
         data: {
-            fontSize: 14
+            fontSize: null
         },
         created: function () {
             var val = getCookie('fontSize');
@@ -11,6 +44,26 @@
                 this.fontSize = parseInt(val);
             } else {
                 this.fontSize = 0;
+            }
+        },
+        watch: {
+            fontSize: function (newValue) {
+                if (newValue != 0) {
+                    var fontStyle = document.getElementById('fontStyle');
+                    if (!fontStyle) {
+                        fontStyle = document.createElement('style');
+                        fontStyle.id = 'fontStyle';
+                        fontStyle.type = 'text/css';
+                        document.head.append(fontStyle);
+                    }
+                    fontStyle.innerHTML = '*{font-size:' + newValue + 'px!important;}'
+
+                } else {
+                    var fontStyle = document.getElementById('fontStyle');
+                    if (fontStyle) {
+                        fontStyle.remove();
+                    }
+                }
             }
         },
         methods: {}
@@ -39,9 +92,20 @@
         }
         return val
     }
+
     new Vue({
         el: '#main',
         data: {
+            drawer: false,
+            mobile: false,
+            upgrade: {
+                isUpdate: false,
+                body: '',
+                version: '',
+                dialogVisible: false
+            },
+            isResize: false,
+            searchInput: '',
             height: 1000,
             fold: false,
             zoom: false,
@@ -50,7 +114,7 @@
             tabModel: 0,
             tabIndex: 0,
             menus: [],
-            menuActive: '1',
+            menuActive: '0',
             breadcrumbs: [],
             language: window.language,
             pwdDialog: {},
@@ -125,8 +189,18 @@
             models: [],
             fontDialogVisible: false,
             fontSlider: 12,
+            loading: false,
+            menuTextShow: true,
+            menuData: []
         },
         watch: {
+            theme: function (newValue, oldValue) {
+                this.$nextTick(function () {
+                    if (window.renderCallback) {
+                        window.renderCallback(this);
+                    }
+                });
+            },
             fold: function (newValue, oldValue) {
                 // console.log(newValue)
             },
@@ -147,23 +221,36 @@
                     }
                 });
             }
+            /*,
+            tabs: function (newValue, oldValue) {
+
+                //改变tab时把状态储存到sessionStorage
+                console.log(newValue)
+            }*/
         },
         created: function () {
 
+            // this.watch.theme('');
 
             var val = getCookie('fold') == 'true';
             this.small = this.fold = val;
-
+            this.menuTextShow = !this.fold;
 
             var self = this;
-            window.onload = window.onresize = function () {
+            window.onresize = function () {
 
                 self.height = document.documentElement.clientHeight || document.body.clientHeight
                 var width = document.documentElement.clientWidth || document.body.clientWidth;
 
                 if (!self.small) {
-                    self.fold = width < 800;
+
+                    self.menuTextShow = !(width < 800);
+                    self.$nextTick(() => {
+                        self.fold = width < 800;
+                    })
                 }
+                self.isResize = true;
+                self.mobile = width < 800;
 
                 //判断全屏状态
                 try {
@@ -174,12 +261,17 @@
             }
             window.app = this;
 
+
             window.menus.forEach(item => {
                 item.icon = getIcon(item.name, item.icon);
+
                 if (item.models) {
                     item.models.forEach(mItem => {
                         mItem.icon = getIcon(mItem.name, mItem.icon);
+                        self.menuData.push(mItem)
                     });
+                } else {
+                    self.menuData.push(item)
                 }
             });
 
@@ -187,6 +279,7 @@
 
             this.theme = getCookie('theme');
             this.themeName = getCookie('theme_name');
+
 
             //接收子页面的事件注册
             window.themeEvents = [];
@@ -198,9 +291,31 @@
                     fontEvents.push(handler);
                 }
             }
+            var temp_tabs = sessionStorage['tabs'];
 
+            if (temp_tabs && temp_tabs != '') {
+                this.tabs = JSON.parse(temp_tabs);
+            }
+            if (location.hash != '') {
+                openByHash();
+            }
+
+            //elementui布局问题，导致页面不能正常撑开，调用resize使其重新计算
+            if (window.onresize) {
+                window.onresize();
+            }
+            this.$nextTick(function () {
+                if (window.renderCallback) {
+                    window.renderCallback(this);
+                }
+            });
         },
         methods: {
+            syncTabs: function () {
+                if (window.sessionStorage) {
+                    sessionStorage['tabs'] = JSON.stringify(this.tabs);
+                }
+            },
             reset: function () {
                 this.fontSlider = 14;
                 fontConfig.fontSize = 0;
@@ -227,7 +342,16 @@
             },
             iframeLoad: function (tab, e) {
                 url = e.target.contentWindow.location.href
+
                 tab.newUrl = url;
+                tab.loading = false;
+                this.$forceUpdate();
+                var self = this;
+                e.target.contentWindow.beforeLoad = function () {
+                    tab.loading = true;
+                    self.$forceUpdate();
+                }
+                this.loading = false;
             },
             setTheme: function (item) {
                 var url = window.themeUrl;
@@ -266,8 +390,12 @@
             tabClick: function (tab) {
                 var item = this.tabs[tab.index];
                 var index = item.index;
-                this.menuActive = index;
+                this.menuActive = String(index);
                 this.breadcrumbs = item.breadcrumbs;
+                if (tab.index == '0') {
+                    item.url = '/'
+                }
+                changeUrl(item);
             },
             handleTabsEdit: function (targetName, action) {
 
@@ -281,6 +409,7 @@
                                 next = temp.id;
                                 self.menuActive = temp.index;
                                 self.breadcrumbs = temp.breadcrumbs;
+                                changeUrl(temp)
                             }
                         }
                     });
@@ -289,16 +418,40 @@
                     if (targetName != 0) {
                         this.tabs = this.tabs.filter(tab => tab.id !== targetName);
                     }
+                    this.syncTabs();
                 }
             }
             ,
-            openTab: function (data, index) {
+            openTab: function (data, index, selected, loading) {
+                if (data.breadcrumbs) {
+                    this.breadcrumbs = data.breadcrumbs;
+                }
+                //如果data没有eid，就直接打开或者添加，根据url
+                if (!data.eid) {
+                    data.eid = new Date().getTime() + "" + Math.random();
+                }
+
+                if (index) {
+                    this.menuActive = String(index);
+                }
+                if (selected) {
+                    //找到name，打开
+                    // console.log(data)
+                    for (var i = 0; i < this.tabs.length; i++) {
+                        if (this.tabs[i].url == data.url) {
+                            this.tabModel = this.tabs[i].id;
+                            break;
+                        }
+                    }
+                    return;
+                }
+
                 this.breadcrumbs = data.breadcrumbs;
                 var exists = null;
                 //判断是否存在，存在就直接打开
                 for (var i = 0; i < this.tabs.length; i++) {
                     var tab = this.tabs[i];
-                    if (tab.name == data.name) {
+                    if (tab.eid == data.eid) {
                         exists = tab;
                         continue;
                     }
@@ -307,37 +460,64 @@
                 if (exists) {
                     this.tabModel = exists.id;
                 } else {
-                    data.id = new Date().getTime() + "" + Math.random();
+                    //其他的网址loading会一直转
+                    if (data.url && data.url.indexOf('http') != 0) {
+                        if (loading) {
+                            data.loading = true;
+                            this.loading = true;
+                        } else {
+                            data.loading = false;
+                            this.loading = false;
+                        }
+                    }
+                    // data.id = new Date().getTime() + "" + Math.random();
+                    data.id = data.eid;
                     data.index = index;
                     this.tabs.push(data);
                     this.tabModel = data.id;
                 }
-
+                changeUrl(data)
+                this.syncTabs();
             }
             ,
             foldClick: function () {
-                if (this.fold) {
-                    this.fold = false;
-                } else {
-                    this.fold = true;
+
+                //移动端浮动菜单
+                var width = document.documentElement.clientWidth || document.body.clientWidth;
+                if (width < 800) {
+                    this.drawer = !this.drawer;
+                    return;
                 }
+                this.menuTextShow = !this.menuTextShow;
+                this.$nextTick(() => {
+                    this.fold = !this.fold;
 
-                this.small = this.fold;
+                    this.small = this.fold;
+                    //设置进cookie
+                    setCookie('fold', this.fold);
+                });
 
-                //设置进cookie
-                setCookie('fold', this.fold);
+
             }
             ,
             changePassword: function () {
                 var width = document.documentElement.clientWidth || document.body.clientWidth;
                 if (width > 800) {
                     this.pwdDialog = {
-                        url: window.urls.changePassword,
+                        url: window.urls.changePassword + '?dialog=1',
                         name: language.change_password,
                         show: true
                     };
                 } else {
-                    this.openTab({url: window.urls.changePassword, icon: 'far fa-edit', name: language.change_password})
+                    this.openTab({
+                        url: window.urls.changePassword,
+                        icon: 'far fa-edit',
+                        name: language.change_password,
+                        breadcrumbs: [{
+                            name: language.change_password,
+                            icon: 'far fa-edit'
+                        }]
+                    })
                     app.breadcrumbs = [language.change_password];
                 }
             }
@@ -348,6 +528,10 @@
                     cancelButtonText: language.no,
                     type: 'warning'
                 }).then(function () {
+                    //清除cookie主题设置和sessionStore数据
+                    delete sessionStorage['tabs'];
+                    setCookie('theme', '');
+                    setCookie('theme_name', '');
                     window.location.href = window.urls.logout;
                 }).catch(function () {
 
@@ -386,8 +570,15 @@
             displayTimeline: function () {
                 this.timeline = !this.timeline;
             },
-            report: function () {
-                window.open('https://github.com/newpanjing/simpleui/issues')
+            report: function (url) {
+                if (!url) {
+                    if ($("html").lang) {
+                        url = 'https://simpleui.88cto.com';
+                    } else {
+                        url = 'https://github.com/newpanjing/simpleui/issues';
+                    }
+                }
+                window.open(url);
             }
         }
     })
