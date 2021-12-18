@@ -262,18 +262,7 @@
             window.app = this;
 
 
-            window.menus.forEach(item => {
-                item.icon = getIcon(item.name, item.icon);
-
-                if (item.models) {
-                    item.models.forEach(mItem => {
-                        mItem.icon = getIcon(mItem.name, mItem.icon);
-                        self.menuData.push(mItem)
-                    });
-                } else {
-                    self.menuData.push(item)
-                }
-            });
+            menus = this.handlerMenus(menus);
 
             this.menus = window.menus
 
@@ -311,6 +300,25 @@
             });
         },
         methods: {
+            handlerMenus(menus) {
+                let self = this;
+                menus.forEach(item => {
+                    item.icon = getIcon(item.name, item.icon);
+
+                    if (item.models) {
+                        item.models.forEach(mItem => {
+                            mItem.icon = getIcon(mItem.name, mItem.icon);
+                            self.menuData.push(mItem)
+                            if(mItem.models){
+                                self.handlerMenus(mItem.models);
+                            }
+                        });
+                    } else {
+                        self.menuData.push(item)
+                    }
+                });
+                return menus;
+            },
             syncTabs: function () {
                 if (window.sessionStorage) {
                     sessionStorage['tabs'] = JSON.stringify(this.tabs);
@@ -374,15 +382,27 @@
                 window.open(url);
             },
             contextmenu: function (item, e) {
+                //右键菜单，如果x+菜单宽度超过屏幕宽度，就默认为屏幕宽度-10-菜单宽度
 
                 //home没有popup menu
                 if (item.id == '0') {
                     return;
                 }
                 this.popup.tab = item;
-                this.popup.left = e.clientX;
-                this.popup.top = e.clientY;
                 this.popup.show = true;
+                this.$nextTick(function () {
+                    let el = this.$refs.popupmenu;
+                    el.style.width = '150px';
+                    let x = e.clientX;
+
+                    let w = document.body.offsetWidth
+                    if (x + 150 > w) {
+                        x = w - 160;
+                    }
+
+                    this.popup.left = x;
+                    this.popup.top = e.clientY;
+                });
             },
             mainClick: function (e) {
                 this.popup.show = false;
@@ -572,7 +592,7 @@
             },
             report: function (url) {
                 if (!url) {
-                    if ($("html").lang) {
+                    if (document.querySelector('html').lang) {
                         url = 'https://simpleui.88cto.com';
                     } else {
                         url = 'https://github.com/newpanjing/simpleui/issues';

@@ -21,7 +21,7 @@
 
                 {% if cl.search_fields %}
 
-                    <el-input class="simpleui-form-item"
+                    <el-input size="small" class="simpleui-form-item"
                               clearable
                               name="{{ search_var }}"
                               :placeholder="placeholder"
@@ -36,6 +36,7 @@
                         {% if spec|get_date_type == 'date' or spec|get_date_type == 'datetime' %}
 
                             <el-date-picker class="simpleui-form-item"
+                                    size="small"
                                     v-model="{{ spec.field_path }}"
                                     @change="change{{ spec|get_date_type|capfirst }}"
                                     type="{{ spec|get_date_type }}range"
@@ -45,12 +46,12 @@
 
                             <input type="hidden" v-model="{{ spec.field_generic }}gte"
                                    name="{{ spec.field_generic }}gte"/>
-                            <input type="hidden" v-model="{{ spec.field_generic }}lt"
-                                   name="{{ spec.field_generic }}lt"/>
+                            <input type="hidden" v-model="{{ spec.field_generic }}lte"
+                                   name="{{ spec.field_generic }}lte"/>
 
                         {% elif spec|has_filter %}
                             <input type="hidden" v-model="{{ spec.parameter_name }}" name="{{ spec.parameter_name }}"/>
-                            <el-select class="simpleui-form-item" filterable v-model="{{ spec.parameter_name }}" clearable placeholder="{{ spec.title }}">
+                            <el-select size="small" class="simpleui-form-item" filterable v-model="{{ spec.parameter_name }}" clearable placeholder="{{ spec.title }}">
                                 {% for option in spec.lookup_choices %}
                                     <el-option label="{{ option.1 }}" value="{{ option.0 }}"></el-option>
                                 {% endfor %}
@@ -59,7 +60,7 @@
                         {% else %}
 
                             <input type="hidden" v-model="{{ spec.lookup_kwarg }}" name="{{ spec.lookup_kwarg }}"/>
-                            <el-select class="simpleui-form-item" filterable v-model="{{ spec.lookup_kwarg }}" clearable
+                            <el-select size="small" class="simpleui-form-item" filterable v-model="{{ spec.lookup_kwarg }}" clearable
                                        placeholder="{{ spec.title }}">
                                 {% if spec|get_date_type == 'time' %}
                                     {% for option in spec.lookup_choices %}
@@ -91,7 +92,7 @@
 
                     {% endfor %}
                 {% endif %}
-                <el-button type="primary" icon="el-icon-search" @click="formSubmit()">{% trans 'Search' %}</el-button>
+                <el-button size="small" type="primary" icon="el-icon-search" @click="formSubmit()">{% trans 'Search' %}</el-button>
 
 
             {% if show_result_count %}
@@ -113,7 +114,6 @@
 
     <script type="text/javascript">
         window.getLanuage = function (key) {
-            console.log(key)
             if (!window.Lanuages) {
                 return "";
             }
@@ -150,7 +150,7 @@
                         {% if spec.links %}
                             '{{ spec.field_path }}': '',
                             '{{ spec.field_generic }}gte': '',
-                            '{{ spec.field_generic }}lt': '',
+                            '{{ spec.field_generic }}lte': '',
                         {% elif spec|has_filter %}
                             '{{ spec.parameter_name }}':'',
                         {% else %}
@@ -177,7 +177,7 @@
                 try {
                     date_field.forEach(key => {
                         var start = self[key + "__gte"];
-                        var end = self[key + "__lt"];
+                        var end = self[key + "__lte"];
                         self[key] = [start, end];
                     });
                 } catch (e) {
@@ -197,19 +197,19 @@
 
                                             if (type == 'date') {
                                                 this['{{ spec.field_generic }}gte'] = newValue[0].format('yyyy-MM-dd');
-                                                this['{{ spec.field_generic }}lt'] = newValue[1].format('yyyy-MM-dd');
+                                                this['{{ spec.field_generic }}lte'] = newValue[1].format('yyyy-MM-dd');
                                             } else if (type == 'datetime') {
                                                 this['{{ spec.field_generic }}gte'] = newValue[0].format('yyyy-MM-dd hh:mm:ss{% get_tz_suffix %}');
-                                                this['{{ spec.field_generic }}lt'] = newValue[1].format('yyyy-MM-dd hh:mm:ss{% get_tz_suffix %}');
+                                                this['{{ spec.field_generic }}lte'] = newValue[1].format('yyyy-MM-dd hh:mm:ss{% get_tz_suffix %}');
                                             }
                                         }
                                     } else {
                                         if (type == 'date') {
                                             this['{{ spec.field_generic }}gte'] = '';
-                                            this['{{ spec.field_generic }}lt'] = '';
+                                            this['{{ spec.field_generic }}lte'] = '';
                                         } else if (type == 'datetime') {
                                             this['{{ spec.field_generic }}gte'] = '';
-                                            this['{{ spec.field_generic }}lt'] = '';
+                                            this['{{ spec.field_generic }}lte'] = '';
                                         }
                                     }
                                 } catch (e) {
